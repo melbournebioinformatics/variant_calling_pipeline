@@ -55,7 +55,7 @@ stages = {
     },
     'realignIntervals': {
         # Hard-coded to take 2 known indels files right now
-        'command': "./GenomeAnalysisTK 1 -T RealignerTargetCreator -R %ref -I %bam --known %indels_goldstandard --known %indels_1000G -log %log -o %out",
+        'command': "./GenomeAnalysisTK 1 -T RealignerTargetCreator -R %ref -I %bam --known %indels_goldstandard --known %indels_1000G -L %bed -log %log -o %out",
         'memInGB': 23,
         'walltime': "7:00:00:00"
     },
@@ -79,13 +79,13 @@ stages = {
         'walltime': "3:00:00:00"
     },
     'callSNPs': {
-        'command': "./GenomeAnalysisTK 12 -T UnifiedGenotyper -nt 8 -R %ref -I %bam --dbsnp %dbsnp -stand_call_conf 50.0 -stand_emit_conf 10.0 -dcov 1600 -l INFO -A AlleleBalance -A DepthOfCoverage -A FisherStrand -glm SNP -log %log -o %out",
+        'command': "./GenomeAnalysisTK 12 -T UnifiedGenotyper -nt 8 -R %ref -I %bam -L %bed --dbsnp %dbsnp -stand_call_conf 50.0 -stand_emit_conf 10.0 -dcov 1600 -l INFO -A AlleleBalance -A DepthOfCoverage -A FisherStrand -glm SNP -log %log -o %out",
         'queue': 'smp',
         'memInGB': 23,
         'walltime': "24:00:00"
     },
     'callIndels': {
-        'command': "./GenomeAnalysisTK 12 -T UnifiedGenotyper -nt 8 -R %ref -I %bam --dbsnp %dbsnp -stand_call_conf 50.0 -stand_emit_conf 10.0 -dcov 1600 -l INFO -A AlleleBalance -A DepthOfCoverage -A FisherStrand -glm INDEL -log %log -o %out",
+        'command': "./GenomeAnalysisTK 12 -T UnifiedGenotyper -nt 8 -R %ref -I %bam -L %bed --dbsnp %dbsnp -stand_call_conf 50.0 -stand_emit_conf 10.0 -dcov 1600 -l INFO -A AlleleBalance -A DepthOfCoverage -A FisherStrand -glm INDEL -log %log -o %out",
         'queue': 'smp',
         'memInGB': 23,
         'walltime': "24:00:00"
@@ -108,10 +108,18 @@ stages = {
         'modules': [ "perl/5.10.1", "ensembl/67" ]
     },
     'depthOfCoverage': {
-        'command': "./GenomeAnalysisTK 4 -T DepthOfCoverage -R %ref -I %bam -omitBaseOutput -ct 1 -ct 10 -ct 20 -ct 30 -o %out",
+        'command': "./GenomeAnalysisTK 4 -T DepthOfCoverage -R %ref -I %bam -L %bed -omitBaseOutput -ct 1 -ct 10 -ct 20 -ct 30 -o %out",
+    },
+    'exonCoverage': {
+        'command': "coverageBed -abam %bam -b %exon_bed > %out",
+        'modules': [ "bedtools/2.9.0" ]
+    },
+    'intersectBam': {
+        'command': "intersectBed -abam %bam -b %bed > %out",
+        'modules': [ "bedtools/2.9.0" ]
     },
     'collateReadcounts': {
-        'command': 'python count_flagstat_wgs.py %dir %outdir',
+        'command': 'python count_flagstat_exome.py %dir %outdir',
         'walltime': "00:10:00"
     }
 }
