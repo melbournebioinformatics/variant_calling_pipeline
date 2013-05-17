@@ -1,0 +1,6 @@
+#!/bin/sh
+
+mem=$1
+shift
+
+java -Xmx${mem}g -Djava.io.tmpdir=$TMPDIR -jar $PICARD_HOME/lib/SortSam.jar TMP_DIR=$TMPDIR $*
