@@ -4,23 +4,25 @@
 GATK-based variant-calling pipeline.
 
 Authors: Bernie Pope, Clare Sloggett, Gayle Philip.
+Thanks to Dmitri Mouradov and Maria Doyle for input on the initial 
+analysis design.
+Thanks to Matt Wakefield for contributions to Rubra 
+(https://github.com/bjpop/rubra) during pipeline development.
 
 Description:
 
 This program implements a workflow pipeline for next generation
-sequencing variant detection using the Broad Institute's GATK.
+sequencing variant detection using the Broad Institute's GATK for
+variant calling and using ENSEMBL for basic annotation.
 
-It uses the rubra (https://github.com/bjpop/rubra) based on the 
-Ruffus library to make the description of the pipeline
-more declarative.
+It uses Rubra (https://github.com/bjpop/rubra) based on the 
+Ruffus library.
 
 It supports parallel evaluation of independent pipeline stages,
 and can run stages on a cluster environment.
 
 The pipeline is configured by an options file in a python file,
 including the actual commands which are run at each stage.
-
-This version attempts to make the pipeline more generic and modular.
 """
 
 
