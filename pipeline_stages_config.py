@@ -1,3 +1,21 @@
+
+# stageDefaults contains the default options which are applied to each stage (command).
+# This section is required for every Rubra pipeline.
+# These can be overridden by options defined for individual stages, below.
+# Stage options which Rubra will recognise are: 
+#  - distributed: a boolean determining whether the task should be submitted to a cluster
+#      job scheduling system (True) or run on the system local to Rubra (False). 
+#  - walltime: for a distributed PBS job, gives the walltime requested from the job
+#      queue system; the maximum allowed runtime. For local jobs has no effect.
+#  - memInGB: for a distributed PBS job, gives the memory in Gigabytes requested from the 
+#      job queue system. For local jobs has no effect.
+#  - queue: for a distributed PBS job, this is the name of the queue to submit the
+#      job to. For local jobs has no effect.
+#  - modules: the modules to be loaded before running the task. This is intended for  
+#      systems with environment modules installed. Rubra will call module load on each 
+#      required module before running the task. Note that defining modules for individual 
+#      stages will override (not add to) any modules listed here. This currently only
+#      works for distributed jobs.
 stageDefaults = {
     'distributed': True,
     'walltime': "08:00:00",
@@ -12,6 +30,13 @@ stageDefaults = {
         "gatk/1.6-7"
     ]
 }
+
+# stages should hold the details of each stage which can be called by runStageCheck.
+# This section is required for every Rubra pipeline.
+# Calling a stage in this way carries out checkpointing and, if desired, batch job
+# submission. 
+# Each stage must contain a 'command' definition. See stageDefaults above for other 
+# allowable options.
 stages = {
     "fastqc": {
         "command": "fastqc --quiet -o %outdir %seq",
@@ -91,11 +116,11 @@ stages = {
         'walltime': "24:00:00"
     },
     'filterSNPs': {
-        # Very minimal filters based on GATK recommendations. VQSR is preferable if possible.
+        # Very minimal hard filters based on GATK recommendations. VQSR is preferable if possible.
         'command': "./GenomeAnalysisTK 4 -T VariantFiltration -R %ref --variant %vcf --filterExpression 'QD < 2.0 || MQ < 40.0 || FS > 60.0 || HaplotypeScore > 13.0 || MQRankSum < -12.5 || ReadPosRankSum < -8.0' --filterName 'GATK_MINIMAL_FILTER' -log %log -o %out",
     },
     'filterIndels': {
-        # Very minimal filters based on GATK recommendations. VQSR is preferable if possible.
+        # Very minimal hard filters based on GATK recommendations. VQSR is preferable if possible.
         # If you have 10 or more samples GATK also recommends the filter InbreedingCoeff < -0.8
         'command': "./GenomeAnalysisTK 4 -T VariantFiltration -R %ref --variant %vcf --filterExpression 'QD < 2.0 || ReadPosRankSum < -20.0 || FS > 200.0' --filterName 'GATK_MINIMAL_FILTER' -log %log -o %out",
     },
