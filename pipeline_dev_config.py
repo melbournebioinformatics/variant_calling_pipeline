@@ -1,5 +1,6 @@
 
-# This section is used by the variant calling pipeline.py to specify reference data files.
+# This section is used by the variant calling pipeline.py to specify input data and 
+# working directories.
 #
 # Note that if you have downloaded the pipeline the directory names below are examples 
 # only and you will need to edit them to suit your needs.
