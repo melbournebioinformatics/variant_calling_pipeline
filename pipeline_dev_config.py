@@ -51,6 +51,9 @@ working_files = {
 #     Note that your genome must use the same chromosome naming convention as any other
 #     reference files (such as dbSNP); if you use hg19 (chr1,chr2) instead of b37 (1,2)
 #     you may need to convert the files suggested below.
+#  - Capture bed file for targeted regions (e.g. exons): This needs to match
+#      the capture kit used in the experiment and should be supplied by whoever does the
+#      sequencing (or library prep).
 #  - dbSNP variants: dbSNP is at http://www.ncbi.nlm.nih.gov/projects/SNP/
 #     A useful release summary is at http://www.ncbi.nlm.nih.gov/projects/SNP/snp_summary.cgi
 #     We used human variants which were obtained in VCF format from
@@ -66,6 +69,11 @@ working_files = {
 #  - bwa_reference: the reference genome fasta. Should be in the same location as the
 #      index files produced by bwa index.
 #      TODO: do this indexing as part of the pipeline and check for index files.
+#  - exon_bed: this defines the regions targeted by the exome capture.  
+#  - exon_bed_extended: this defines the exon capture regions extended by a certain distance
+#      to check for reads which map near but not in the expected capture regions. It is 
+#      used purely for QC. We use a 150bp extension on each side of each region.
+#      TODO: carry out this extension as part of the pipeline.
 #  - dbsnp: the dbSNP variants file in VCF format, for annotating variants and for 
 #       GATK base quality recalibration.
 #  - indels_realign_goldstandard and
