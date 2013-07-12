@@ -1,7 +1,7 @@
 #!/bin/env python
 
 """
-GATK-based variant-calling pipeline.
+GATK-based variant-calling pipeline, WGS version.
 
 Authors: Bernie Pope, Clare Sloggett, Gayle Philip.
 Thanks to Dmitri Mouradov and Maria Doyle for input on the initial 
