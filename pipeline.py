@@ -57,6 +57,12 @@ for fastq_dir in working_files['fastq_dirs']:
     original_fastq_files += glob(os.path.join(fastq_dir, '*.fastq.gz'))
     original_fastq_files += glob(os.path.join(fastq_dir, '*_sequence.txt.gz'))
 
+if len(original_fastq_files)==0:
+    print "No input files found. Do the filenames follow the naming convention?"
+    print "Directories searched:"
+    print "\n".join(working_files['fastq_dirs'])
+    sys.exit(1)
+    
 # Parse metadata out of input file names and construct symlinks
 # Metadata is put into a dict (for the rest of ruffus) and some of it also into symlinks (for filename uniqueness)
 # currently parsing by assuming AGRF naming structure and paired-end reads
@@ -74,12 +80,13 @@ if pipeline_options.pipeline['restrict_samples']:
 else:
     fastq_files = sorted(all_fastq_files)
 
+print "Symlinked files that will be used:"
 for file in fastq_files:
     print file
+print
 print "Output dir is %s" % working_files['output_dir']
 print "Log dir is %s" % logDir
-
-# Pipeline declarations
+print
 
 # Create output subdirectories
 
@@ -103,6 +110,8 @@ mkDir(ensembl_dir)
 # directory for final summary tables
 results_dir = os.path.join(output_dir, "results")
 mkDir(results_dir)
+
+# Pipeline declarations
 
 # Alignment and correction steps
 
