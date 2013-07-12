@@ -34,11 +34,11 @@
 # Illumina data.    
 #
 working_files = {
-    'output_dir': '/vlsci/VR0244/shared/test_ruffus_exome/output',
     'fastq_dirs': [
          '/vlsci/VR0244/shared/meg/EXOME/FASTQ'
     ],
-    'fastq_symlink_dir': '/vlsci/VR0244/shared/test_ruffus_exome/fastq_symlinks'
+    'fastq_symlink_dir': '/vlsci/VR0244/shared/test_ruffus_exome/fastq_symlinks',
+    'output_dir': '/vlsci/VR0244/shared/test_ruffus_exome/output'
 }
 
 # This section is used by the variant calling pipeline.py to specify reference data files.
