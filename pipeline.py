@@ -266,49 +266,47 @@ def baseQualRecalTabulate(inputs, outputs):
     runStageCheck('baseQualRecalTabulate', flag_file, input_bam, ref_files['fasta_reference'], input_csv, logFile, output_bam)
     remove_GATK_bai(output_bam)
 
-# XXX we are assuming realignment was the first step. The alternative would be to assume the sample name contains no '.' (or '_'). We should be able to assume both.
-# Note that we are now taking everything before the first '.' on the assumption that suffixes are step names, and making the only suffix .final.bam ; this may be not be what every pipeline wants.
-@follows('indexRecalibratedBams')
-@follows('igvcountRecalibratedBams')
-@transform(baseQualRecalTabulate, 
-            regex(r'(.*?)([^/\.]+)([^/]*)\.bam'),
-            add_inputs([r'\1\2\3.bam.bai',r'\1\2\3.bam.tdf']),
-            [r'\1\2.final.bam', r'\1\2.final.bam.bai', r'\1\2.final.bam.tdf'])
-def linkToFinalBam(inputs, outputs):
+# Temporarily putting this indexing step here to work around bug
+@transform(baseQualRecalTabulate, suffix('.bam'),
+            ['.bam.bai', '.bam.indexRecalibratedBams.Success'])
+def indexRecalibratedBams(inputs, outputs):
     """
-    Create a symlink defining the final stage of alignment refinement, for use 
-    by any steps which want the definitive bam. Demand bai and tdf files exist 
-    and link to them too.
+    Index the recalibrated bams using samtools. 
     """
-    [bam, _success], [bai, tdf] = inputs
-    bam_link, bai_link, tdf_link = outputs
-    mkForceLink(bam, bam_link)
-    mkForceLink(bai, bai_link)
-    mkForceLink(tdf, tdf_link)
+    bam, _success = inputs
+    output, flag_file = outputs
+    print "samtools index on %s" % os.path.basename(bam)
+    runStageCheck('indexBam', flag_file, bam)
 
 # Variant calling steps
 
-@transform(linkToFinalBam, 
-            regex(r'(.*?)([^/]+)\.final\.bam'),
-            [r'%s/\2.SNP.vcf' % variant_dir, r'%s/\2.SNP.vcf.idx' % variant_dir, r'%s/\2.callSNPs.Success' % variant_dir])
+@follows(indexRecalibratedBams)
+@transform(baseQualRecalTabulate, 
+            regex(r'(.*?)([^/]+)\.recal\.bam'),
+            [r'%s/\2.SNP.vcf' % variant_dir, 
+             r'%s/\2.SNP.vcf.idx' % variant_dir, 
+             r'%s/\2.callSNPs.Success' % variant_dir])
 def callSNPs(inputs, outputs):
     """
     Use GATK UnifiedGenotyper to call SNPs from recalibrated bams.
     """
-    bam, _bai, _tdf = inputs
+    bam, _success = inputs
     output_vcf, _idx, flag_file = outputs
     logFile = mkLogFile(logDir, bam, '.callSNPs.log')
     print "calling SNPs from %s" % bam
     runStageCheck('callSNPs', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], ref_files['dbsnp'], logFile, output_vcf)
 
-@transform(linkToFinalBam, 
-            regex(r'(.*?)([^/]+)\.final\.bam'),
-            [r'%s/\2.INDEL.vcf' % variant_dir, r'%s/\2.INDEL.vcf.idx' % variant_dir, r'%s/\2.callIndels.Success' % variant_dir])
+@follows(indexRecalibratedBams)
+@transform(baseQualRecalTabulate, 
+            regex(r'(.*?)([^/]+)\.recal\.bam'),
+            [r'%s/\2.INDEL.vcf' % variant_dir, 
+             r'%s/\2.INDEL.vcf.idx' % variant_dir, 
+             r'%s/\2.callIndels.Success' % variant_dir])
 def callIndels(inputs, outputs):
     """
     Use GATK UnifiedGenotyper to call indels from recalibrated bams.
     """
-    bam, _bai, _tdf = inputs
+    bam, _success = inputs
     output_vcf, _idx, flag_file = outputs
     logFile = mkLogFile(logDir, bam, '.callIndels.log')
     print "calling Indels from %s" % bam
@@ -386,16 +384,7 @@ def indexRealignedBams(inputs, outputs):
     print "samtools index on %s" % os.path.basename(bam)
     runStageCheck('indexBam', flag_file, bam)
 
-@transform(baseQualRecalTabulate, suffix('.bam'),
-            ['.bam.bai', '.bam.indexRecalibratedBams.Success'])
-def indexRecalibratedBams(inputs, outputs):
-    """
-    Index the recalibrated bams using samtools. 
-    """
-    bam, _success = inputs
-    output, flag_file = outputs
-    print "samtools index on %s" % os.path.basename(bam)
-    runStageCheck('indexBam', flag_file, bam)
+
 
 @transform(mergeBams, suffix('.bam'),
             ['.bam.tdf', '.bam.igvcountMergedBams.Success'])
@@ -510,8 +499,9 @@ def dedupedDepthOfCoverage(inputs, outputs):
     print "calculating coverage statistics using GATK DepthOfCoverage on %s" % bam
     runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], output_base)
 
-@transform(linkToFinalBam, 
-            regex(r'(.*?)([^/]+)\.final\.bam'),
+@follows(indexRecalibratedBams)
+@transform(baseQualRecalTabulate, 
+            regex(r'(.*?)([^/]+)\.recal\.bam'),
             [r'%s/\2.DepthOfCoverage.sample_cumulative_coverage_counts' % coverage_dir, 
             r'%s/\2.DepthOfCoverage.sample_cumulative_coverage_proportions' % coverage_dir, 
 #            r'%s/\2.DepthOfCoverage.sample_gene_summary' % coverage_dir, 
@@ -524,7 +514,7 @@ def finalDepthOfCoverage(inputs, outputs):
     """
     Use GATK DepthOfCoverage to get coverage statistics.
     """
-    bam, _bai, _tdf = inputs
+    bam, _success = inputs
     flag_file = outputs[-1]
     output_example = outputs[0]
     output_base = os.path.splitext(output_example)[0]
