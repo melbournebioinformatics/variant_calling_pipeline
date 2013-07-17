@@ -1,0 +1,2 @@
+This directory contains test data which can be used to run the WGS(master) version of the pipeline.
+It is fastq data from the 1000 genomes project, individual NA12878, roughly restricted to a small genomic region (chromosome 17, 39700000-39800000).

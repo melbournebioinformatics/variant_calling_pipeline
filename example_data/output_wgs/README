@@ -1,0 +1,3 @@
+This directory should contain the output created by running the WGS version of the pipeline on the WGS test data.
+The output directory needs to exist before the pipeline is invoked.
+This file mainly exists to make sure git will recognise this directory as version-controlled.

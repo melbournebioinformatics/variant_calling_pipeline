@@ -1,0 +1,3 @@
+This directory should contain the symlinks to the raw input fastq files, created by invoking the WGS version of the pipeline on the WGS test data.
+This directory currently needs to exist before the pipeline is invoked.
+This file mainly exists to make sure git will recognise this directory as version-controlled.

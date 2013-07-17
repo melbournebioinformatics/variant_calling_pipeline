@@ -35,10 +35,10 @@
 #
 working_files = {
     'fastq_dirs': [
-         '/vlsci/VR0244/shared/meg/EXOME/FASTQ'
+         './example_data/input_data_wgs'
     ],
-    'fastq_symlink_dir': '/vlsci/VR0244/shared/test_ruffus_wgs/fastq_symlinks',
-    'output_dir': '/vlsci/VR0244/shared/test_ruffus_wgs/output'
+    'fastq_symlink_dir': './example_data/output_wgs/fastq_symlinks',
+    'output_dir': './example_data/output_wgs'
 }
 
 # This section is used by the variant calling pipeline.py to specify reference data files.
@@ -124,6 +124,6 @@ pipeline = {
     'force': [],
     'rebuild' : "fromstart",
 
-    'restrict_samples': True,
-    'allowed_samples': ['mw4241']
+    'restrict_samples': False,
+    'allowed_samples': []
 }
