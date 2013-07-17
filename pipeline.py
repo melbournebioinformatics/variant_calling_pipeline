@@ -521,15 +521,16 @@ def finalDepthOfCoverage(inputs, outputs):
     print "calculating coverage statistics using GATK DepthOfCoverage on %s" % bam
     runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], output_base)
 
-@transform(linkToFinalBam, 
-            regex(r'(.*?)([^/]+)\.final\.bam'),
+@follows(indexRecalibratedBams)
+@transform(baseQualRecalTabulate, 
+            regex(r'(.*?)([^/]+)\.recal\.bam'),
             [r'%s/\2.exon_coverage.txt' % coverage_dir, 
             r'%s/\2.exonCoverage.Success' % coverage_dir])
 def exonCoverage(inputs, outputs):
     """
     Use bedtools' coverageBed to get coverage for each exon.
     """
-    bam, _bai, _tdf = inputs
+    bam, _success = inputs
     output, flag_file = outputs
     print "calculating exon coverage using coverageBed on %s" % bam
     runStageCheck('exonCoverage', flag_file, bam, ref_files['exon_bed'], output)
