@@ -12,8 +12,6 @@ import os.path
 from collections import defaultdict
 from rubra.utils import (mkLink)
 
-# XXX TODO: if the timestamp of a fastq file is later than the timestamp of the symlink, we should delete and remake the symlink so that the pipeline will run with the updated file
-
 def parse_and_link(file, symlink_dir, metadata_dict):
     """
     Parse metadata out of input filename and construct symlink.
@@ -48,6 +46,7 @@ def parse_and_link(file, symlink_dir, metadata_dict):
     metadata_dict[os.path.basename(newfile)]['lane'] = lane
     metadata_dict[os.path.basename(newfile)]['pair'] = pair
     metadata_dict[os.path.basename(newfile)]['encoding'] = encoding
-    mkLink(file, newfile)
+    relative_sourcefile = os.path.relpath(file, symlink_dir)
+    mkLink(relative_sourcefile, newfile)
     return newfile
 

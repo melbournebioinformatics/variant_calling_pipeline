@@ -1,26 +1,28 @@
 #!/bin/env python
 
 """
-GATK-based variant-calling pipeline.
+GATK-based variant-calling pipeline, WGS version.
 
 Authors: Bernie Pope, Clare Sloggett, Gayle Philip.
+Thanks to Dmitri Mouradov and Maria Doyle for input on the initial 
+analysis design.
+Thanks to Matt Wakefield for contributions to Rubra 
+(https://github.com/bjpop/rubra) during pipeline development.
 
 Description:
 
 This program implements a workflow pipeline for next generation
-sequencing variant detection using the Broad Institute's GATK.
+sequencing variant detection using the Broad Institute's GATK for
+variant calling and using ENSEMBL for basic annotation.
 
-It uses the rubra (https://github.com/bjpop/rubra) based on the 
-Ruffus library to make the description of the pipeline
-more declarative.
+It uses Rubra (https://github.com/bjpop/rubra) based on the 
+Ruffus library.
 
 It supports parallel evaluation of independent pipeline stages,
 and can run stages on a cluster environment.
 
 The pipeline is configured by an options file in a python file,
 including the actual commands which are run at each stage.
-
-This version attempts to make the pipeline more generic and modular.
 """
 
 
@@ -54,6 +56,12 @@ for fastq_dir in working_files['fastq_dirs']:
     original_fastq_files += glob(os.path.join(fastq_dir, '*.fastq.gz'))
     original_fastq_files += glob(os.path.join(fastq_dir, '*_sequence.txt.gz'))
 
+if len(original_fastq_files)==0:
+    print "No input files found. Do the filenames follow the naming convention?"
+    print "Directories searched:"
+    print "\n".join(working_files['fastq_dirs'])
+    sys.exit(1)
+    
 # Parse metadata out of input file names and construct symlinks
 # Metadata is put into a dict (for the rest of ruffus) and some of it also into symlinks (for filename uniqueness)
 # currently parsing by assuming AGRF naming structure and paired-end reads
@@ -71,12 +79,13 @@ if pipeline_options.pipeline['restrict_samples']:
 else:
     fastq_files = sorted(all_fastq_files)
 
+print "Symlinked files that will be used:"
 for file in fastq_files:
     print file
+print
 print "Output dir is %s" % working_files['output_dir']
 print "Log dir is %s" % logDir
-
-# Pipeline declarations
+print
 
 # Create output subdirectories
 
@@ -100,6 +109,8 @@ mkDir(ensembl_dir)
 # directory for final summary tables
 results_dir = os.path.join(output_dir, "results")
 mkDir(results_dir)
+
+# Pipeline declarations
 
 # Alignment and correction steps
 
