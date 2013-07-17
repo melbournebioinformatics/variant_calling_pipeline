@@ -4,7 +4,7 @@
 ## Overview
 
 This is a basic variant-calling and annotation pipeline based developed at the 
-Life Sciences Computation Centre, University of Melbourne.
+Victorian Life Sciences Computation Initiative (VLSCI), University of Melbourne.
 
 It is based around BWA, GATK and ENSEMBL and was originally designed for human (or similar) data. The master branch is configured for WGS data; there is an exome branch configured for variant calling in exome data.
 
