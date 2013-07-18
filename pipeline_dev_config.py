@@ -109,7 +109,7 @@ ref_files = {
 #  - restrict_samples: whether to restrict input files to those specified by allowd_samples
 #  - allowed_samples: sample names that will be run of restrict_samples is True
 pipeline = {
-    'logDir': 'log_varcall_test',    
+    'logDir': 'log_example_wgs',    
     'logFile': 'pipeline.log',
     'style': 'print',
     'procs': 30,
