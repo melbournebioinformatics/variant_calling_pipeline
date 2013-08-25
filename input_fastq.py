@@ -23,7 +23,9 @@ def parse_and_link(file, symlink_dir, metadata_dict):
     Currently will ONLY handle gzipped files, to avoid multiple links to the same data.
     """
     match_old = re.match(r".*?/([^_/]+)_([a-zA-Z0-9-.]+)_s_([0-9]+)_(1|2)_sequence.txt.gz",file)
-    match_new = re.match(r".*?/([a-zA-Z0-9-.]+)_([^_/]+)_[CAGTN]+_L([0-9]+)_R(1|2).fastq.gz",file)
+    match_new = re.match(r".*?/([a-zA-Z0-9-.]+)_[CAGTN]+_([^_/]+)_L([0-9]+)_R(1|2).fastq.gz",file)
+    match_new1 = re.match(r".*?/([a-zA-Z0-9-.]+)_([^_/]+)_[CAGTN]+_L([0-9]+)_R(1|2).fastq.gz",file)
+    match_new2 = re.match(r".*?/_([^_/]+)_([a-zA-Z0-9-.]+)_[CAGTN]+_L([0-9]+)_R(1|2).fastq.gz",file)
     if match_old:
         run_id = match_old.group(1)
         sample = match_old.group(2)
@@ -35,6 +37,18 @@ def parse_and_link(file, symlink_dir, metadata_dict):
         sample = match_new.group(1)
         lane = int(match_new.group(3))
         pair = match_new.group(4)
+        encoding = 'S'
+    elif match_new1:
+    	run_id = match_new1.group(2)
+        sample = match_new1.group(1)
+        lane = int(match_new1.group(3))
+        pair = match_new1.group(4)
+        encoding = 'S'
+    elif match_new2:
+        run_id = match_new2.group(2)
+        sample = match_new2.group(1)
+        lane = int(match_new2.group(3))
+        pair = match_new2.group(4)
         encoding = 'S'
     else:
         print "Unable to parse name of fastq file %s ." % file
