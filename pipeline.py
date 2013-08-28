@@ -1,7 +1,7 @@
 #!/bin/env python
 
 """
-GATK-based variant-calling pipeline, WGS version.
+GATK-based variant-calling pipeline, exome version.
 
 Authors: Bernie Pope, Clare Sloggett, Gayle Philip.
 Thanks to Dmitri Mouradov and Maria Doyle for input on the initial 
@@ -50,6 +50,7 @@ logDir = pipeline_options.pipeline['logDir']
 
 #Metadata holding structures
 fastq_metadata = defaultdict(dict)
+#sample_metadata = defaultdict(dict)
 
 original_fastq_files = []
 for fastq_dir in working_files['fastq_dirs']:
@@ -210,7 +211,7 @@ def realignIntervals(inputs, outputs):
     output_intervals, flag_file = outputs
     logFile = mkLogFile(logDir, bam, '.realignIntervals.log')
     print "calculating realignment intervals for %s" % os.path.basename(bam)
-    runStageCheck('realignIntervals', flag_file, ref_files['fasta_reference'], bam, ref_files['indels_realign_goldstandard'], ref_files['indels_realign_1000G'], logFile, output_intervals)
+    runStageCheck('realignIntervals', flag_file, ref_files['fasta_reference'], bam, ref_files['indels_realign_goldstandard'], ref_files['indels_realign_1000G'], ref_files['exon_bed'], logFile, output_intervals)
 
 def remove_GATK_bai(bamfile):
     """
@@ -293,7 +294,7 @@ def callSNPs(inputs, outputs):
     output_vcf, _idx, flag_file = outputs
     logFile = mkLogFile(logDir, bam, '.callSNPs.log')
     print "calling SNPs from %s" % bam
-    runStageCheck('callSNPs', flag_file, ref_files['fasta_reference'], bam, ref_files['dbsnp'], logFile, output_vcf)
+    runStageCheck('callSNPs', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], ref_files['dbsnp'], logFile, output_vcf)
 
 @follows(indexRecalibratedBams)
 @transform(baseQualRecalTabulate, 
@@ -309,7 +310,7 @@ def callIndels(inputs, outputs):
     output_vcf, _idx, flag_file = outputs
     logFile = mkLogFile(logDir, bam, '.callIndels.log')
     print "calling Indels from %s" % bam
-    runStageCheck('callIndels', flag_file, ref_files['fasta_reference'], bam, ref_files['dbsnp'], logFile, output_vcf)
+    runStageCheck('callIndels', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], ref_files['dbsnp'], logFile, output_vcf)
 
 @transform(callSNPs, suffix('.SNP.vcf'),
             ['.SNP.filtered.vcf', '.SNP.filtered.vcf.idx', '.filterSNPs.Success'])
@@ -334,7 +335,6 @@ def filterIndels(inputs, outputs):
     logFile = mkLogFile(logDir, input_vcf, '.filterIndels.log')
     print "filtering indels from %s" % input_vcf
     runStageCheck('filterIndels', flag_file, ref_files['fasta_reference'], input_vcf, logFile, output_vcf)
-
 
 @transform([filterSNPs, filterIndels], regex(r'.*?([^/]+)\.vcf'), 
     [r'%s/\1.ensembl.vcf' % ensembl_dir,r'%s/\1.getEnsemblAnnotations.Success' % ensembl_dir])
@@ -460,6 +460,7 @@ def vcfIndexIndels(inputs, outputs):
             regex(r'(.*?)([^/]+)\.bam'),
             [r'%s/\2.early.DepthOfCoverage.sample_cumulative_coverage_counts' % coverage_dir, 
             r'%s/\2.early.DepthOfCoverage.sample_cumulative_coverage_proportions' % coverage_dir, 
+#            r'%s/\2.early.DepthOfCoverage.sample_gene_summary' % coverage_dir, 
             r'%s/\2.early.DepthOfCoverage.sample_interval_statistics' % coverage_dir, 
             r'%s/\2.early.DepthOfCoverage.sample_interval_summary' % coverage_dir, 
             r'%s/\2.early.DepthOfCoverage.sample_statistics' % coverage_dir, 
@@ -474,18 +475,19 @@ def earlyDepthOfCoverage(inputs, outputs):
     output_example = outputs[0]
     output_base = os.path.splitext(output_example)[0]
     print "calculating coverage statistics using GATK DepthOfCoverage on %s" % bam
-    runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, output_base)
+    runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], output_base)
 
 @follows(indexDedupedBams)
 @transform(dedup, 
-        regex(r'(.*?)([^/]+)\.dedup\.bam'),
-        [r'%s/\2.deduped.DepthOfCoverage.sample_cumulative_coverage_counts' % coverage_dir, 
-         r'%s/\2.deduped.DepthOfCoverage.sample_cumulative_coverage_proportions' % coverage_dir, 
-         r'%s/\2.deduped.DepthOfCoverage.sample_interval_statistics' % coverage_dir, 
-         r'%s/\2.deduped.DepthOfCoverage.sample_interval_summary' % coverage_dir, 
-         r'%s/\2.deduped.DepthOfCoverage.sample_statistics' % coverage_dir, 
-         r'%s/\2.deduped.DepthOfCoverage.sample_summary' % coverage_dir, 
-         r'%s/\2.dedupedDepthOfCoverage.Success' % coverage_dir])
+            regex(r'(.*?)([^/]+)\.dedup\.bam'),
+            [r'%s/\2.deduped.DepthOfCoverage.sample_cumulative_coverage_counts' % coverage_dir, 
+            r'%s/\2.deduped.DepthOfCoverage.sample_cumulative_coverage_proportions' % coverage_dir, 
+#            r'%s/\2.early.DepthOfCoverage.sample_gene_summary' % coverage_dir, 
+            r'%s/\2.deduped.DepthOfCoverage.sample_interval_statistics' % coverage_dir, 
+            r'%s/\2.deduped.DepthOfCoverage.sample_interval_summary' % coverage_dir, 
+            r'%s/\2.deduped.DepthOfCoverage.sample_statistics' % coverage_dir, 
+            r'%s/\2.deduped.DepthOfCoverage.sample_summary' % coverage_dir, 
+            r'%s/\2.dedupedDepthOfCoverage.Success' % coverage_dir])
 def dedupedDepthOfCoverage(inputs, outputs):
     """
     Use GATK DepthOfCoverage to get a coverage statistics as soon as duplicates are removed.
@@ -495,13 +497,14 @@ def dedupedDepthOfCoverage(inputs, outputs):
     output_example = outputs[0]
     output_base = os.path.splitext(output_example)[0]
     print "calculating coverage statistics using GATK DepthOfCoverage on %s" % bam
-    runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, output_base)
+    runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], output_base)
 
 @follows(indexRecalibratedBams)
 @transform(baseQualRecalTabulate, 
             regex(r'(.*?)([^/]+)\.recal\.bam'),
             [r'%s/\2.DepthOfCoverage.sample_cumulative_coverage_counts' % coverage_dir, 
             r'%s/\2.DepthOfCoverage.sample_cumulative_coverage_proportions' % coverage_dir, 
+#            r'%s/\2.DepthOfCoverage.sample_gene_summary' % coverage_dir, 
             r'%s/\2.DepthOfCoverage.sample_interval_statistics' % coverage_dir, 
             r'%s/\2.DepthOfCoverage.sample_interval_summary' % coverage_dir, 
             r'%s/\2.DepthOfCoverage.sample_statistics' % coverage_dir, 
@@ -516,10 +519,48 @@ def finalDepthOfCoverage(inputs, outputs):
     output_example = outputs[0]
     output_base = os.path.splitext(output_example)[0]
     print "calculating coverage statistics using GATK DepthOfCoverage on %s" % bam
-    runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, output_base)
+    runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], output_base)
+
+@follows(indexRecalibratedBams)
+@transform(baseQualRecalTabulate, 
+            regex(r'(.*?)([^/]+)\.recal\.bam'),
+            [r'%s/\2.exon_coverage.txt' % coverage_dir, 
+            r'%s/\2.exonCoverage.Success' % coverage_dir])
+def exonCoverage(inputs, outputs):
+    """
+    Use bedtools' coverageBed to get coverage for each exon.
+    """
+    bam, _success = inputs
+    output, flag_file = outputs
+    print "calculating exon coverage using coverageBed on %s" % bam
+    runStageCheck('exonCoverage', flag_file, bam, ref_files['exon_bed'], output)
 
 
 # Read-counting steps
+
+@transform(dedup, suffix('.bam'), 
+            ['.exon_intersections.bam', '.intersectBamExons.Success'])   
+def intersectBamExons(inputs, outputs):
+    """
+    Use bedtools' intersectBed on deduped BAM file to get the reads which
+    map to exon capture array regions.
+    """
+    bam, _success = inputs
+    output, flag_file = outputs
+    print "Calculating intersection with exon regions (%s) of %s" % (ref_files['exon_bed'], bam)
+    runStageCheck('intersectBam', flag_file, bam, ref_files['exon_bed'], output)
+
+@transform(dedup, suffix('.bam'), 
+            ['.exon_extended_intersections.bam', '.bam.intersectBamExonsExtended.Success'])   
+def intersectBamExonsExtended(inputs, outputs):
+    """
+    Use bedtools' intersectBed on deduped BAM file to get the reads which
+    map to exon capture array regions.
+    """
+    bam, _success = inputs
+    output, flag_file = outputs
+    print "Calculating intersection with exon + buffer (%s) regions of %s" % (ref_files['exon_bed_extended'], bam)
+    runStageCheck('intersectBam', flag_file, bam, ref_files['exon_bed_extended'], output)
 
 @transform(samToBam, suffix('.bam'), 
             ['.bam.flagstat', '.bam.countRunBam.Success'])
@@ -565,14 +606,35 @@ def countDedupedBam(inputs, outputs):
     print "Running samtools flagstat on %s" % bam
     runStageCheck('flagstat', flag_file, bam, output)
 
+@transform(intersectBamExons, suffix('.bam'), 
+            ['.bam.flagstat', '.bam.countExonsBam.Success'])
+def countExonsBam(inputs, outputs):
+    """
+    Run samtools flagstat on the exon-regions-only bam file.
+    """
+    bam, _success = inputs
+    output, flag_file = outputs
+    print "Running samtools flagstat on %s" % bam
+    runStageCheck('flagstat', flag_file, bam, output)
+
+@transform(intersectBamExonsExtended, suffix('.bam'), 
+            ['.bam.flagstat', '.bam.countExonsExtendedBam.Success'])
+def countExonsExtendedBam(inputs, outputs):
+    """
+    Run samtools flagstat on the extended-exon-regions-only bam file.
+    """
+    bam, _success = inputs
+    output, flag_file = outputs
+    print "Running samtools flagstat on %s" % bam
+    runStageCheck('flagstat', flag_file, bam, output)
 
 # Data collation and plotting steps
 
-@merge([countDedupedBam, countMergedBam],
+@merge([countExonsBam, countExonsExtendedBam, countDedupedBam, countMergedBam],
         ["%s/readcounts.txt" % results_dir, "%s/readcount_fractions.txt" % results_dir, "%s/collateReadcounts.Success" % results_dir])
 def collateReadCounts(inputs, outputs):
     """
-    Collate read counts from samtools flagstat output into a table.
+    Run samtools flagstat on the extended-exon-regions-only bam file.
     """
     # Note expected input and output directories are effectively hard-coded
     in_dir =  sambam_dir
@@ -580,5 +642,3 @@ def collateReadCounts(inputs, outputs):
     flag_file = outputs[-1]
     print "Collating read counts"
     runStageCheck('collateReadcounts', flag_file, in_dir, out_dir)
-
-
