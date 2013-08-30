@@ -21,15 +21,51 @@ stageDefaults = {
     'walltime': "08:00:00",
     'memInGB': 8,
     'queue': "batch",
+    'jobscript': " --account VR0002",
     'modules': [
-        "bwa-gcc/0.5.9",
-        "samtools-gcc/0.1.16",
+        "bwa-intel/0.7.5a",
+        "samtools-intel/0.1.19",
         "picard/1.53",
-        "python-gcc/2.6.4",
-        "R-gcc/2.12.0",
-        "gatk/1.6-7"
+        "python-gcc/2.7.5",
+        "R-intel/2.15.3",
+        "gatk/2.6-5"
     ]
 }
+
+pipeline = {
+    'logDir': 'log_exome_test',
+    'logFile': 'pipeline.log',
+    'style': 'print',
+    'procs': 10,
+    'verbose': 1,
+    'end': ['earlyDepthOfCoverage', 'dedupedDepthOfCoverage', 'finalDepthOfCoverage',
+            'fastqc', 
+            'igvcountMergedBams', 'countRunBam', 
+            'collateReadCounts',
+            'vcfIndexSNPs', 'vcfIndexIndels',
+            'getEnsemblAnnotations',
+            'exonCoverage'],
+    'force': [],
+    'restrict_samples': True,
+    'allowed_samples': ['sample8']
+	}
+
+working_files = {
+    'fastq_dirs': [
+         '/vlsci/VR0281/shared/DSDdata/Users/brunsjrl/Desktop/IDN1/'
+    ],
+    'fastq_symlink_dir': '/vlsci/VR0281/shared/DSDdata/fastq_symlinks',
+    'output_dir': '/vlsci/VR0281/shared/DSDdata/Exome_analysisPipeline_output/'
+}
+
+ref_files = {
+    'fasta_reference': '/vlsci/VR0002/shared/Reference_Files/Indexed_Ref_Genomes/bwa_Indexed/human_g1k_v37.fasta',
+    'exon_bed': '/vlsci/VR0244/shared/Ruth_Exome/SureSelect_XT_Human_All_Exon_v4plus_UTR/TruSeqCustom_WOAgilentSSXTHAEv4TR_targeted_regions.bed',
+    'exon_bed_extended': '/vlsci/VR0244/shared/Ruth_Exome/SureSelect_XT_Human_All_Exon_v4plus_UTR/TruSeqCustom_WOAgilentSSXTHAEv4TR_targeted_regions_plusMinus150bp.bed',
+    'dbsnp': '/vlsci/VR0002/shared/Reference_Files/SNP_db/dbSNP137.vcf',  
+    'indels_realign_goldstandard': '/vlsci/VR0002/shared/Reference_Files/Indels_for_realignment/Mills_and_1000G_gold_standard.indels.b37.vcf',
+    'indels_realign_1000G': '/vlsci/VR0002/shared/Reference_Files/Indels_for_realignment/1000G_phase1.indels.b37.vcf'
+    }
 
 # stages should hold the details of each stage which can be called by runStageCheck.
 # This section is required for every Rubra pipeline.
@@ -42,6 +78,13 @@ stages = {
         "command": "fastqc --quiet -o %outdir %seq",
         "walltime": "10:00:00",
         'modules': [ "fastqc/0.10.1" ]
+    },
+        'indexReferenceBWA': {
+        'command': "bwa index %ref -a bwtsw",
+        'walltime': "10:00:00"
+    },
+    'indexReferenceSAM': {
+        'command': "samtools faidx %ref"
     },
     'alignBWA': {
         'command': "bwa aln -t 8 %encodingflag %ref %seq > %out",
@@ -72,7 +115,7 @@ stages = {
     },
     'igvcount': {
         'command': "igvtools count %bam %out hg19",
-        'modules': [ "igvtools/1.5.15" ]
+        'modules': [ "igv/2.3.15" ]
     },
     'indexVCF': {
         'command': "./vcftools_prepare.sh %vcf",
@@ -80,7 +123,7 @@ stages = {
     },
     'realignIntervals': {
         # Hard-coded to take 2 known indels files right now
-        'command': "./GenomeAnalysisTK 1 -T RealignerTargetCreator -R %ref -I %bam --known %indels_goldstandard --known %indels_1000G -L %bed -log %log -o %out",
+        'command': "./GenomeAnalysisTK 23 -T RealignerTargetCreator -R %ref -I %bam --known %indels_goldstandard --known %indels_1000G -L %bed -log %log -o %out",
         'memInGB': 23,
         'walltime': "7:00:00:00"
     },
@@ -93,14 +136,29 @@ stages = {
         'command': "./MarkDuplicates 6 INPUT=%bam REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT AS=true METRICS_FILE=%log OUTPUT=%out",
         'walltime': '7:00:00:00'
     },
-    'baseQualRecalCount': {
-        'command': "./GenomeAnalysisTK 12 -T CountCovariates -I %bam -R %ref --knownSites %dbsnp -nt 8 -l INFO -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -log %log -recalFile %out",
-        'queue': 'smp',
-        'memInGB': 23,
+#GATK1    'baseQualRecalCount': {
+#GATK1        'command': "./GenomeAnalysisTK 12 -T CountCovariates -I %bam -R %ref --knownSites %dbsnp -nt 8 -l INFO -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -log %log -recalFile %out",
+#GATK1        'queue': 'smp',
+#GATK1        'memInGB': 23,
+#GATK1        'walltime': "3:00:00:00"
+#GATK1    },
+#GATK1    'baseQualRecalTabulate': {
+#GATK1        'command': "./GenomeAnalysisTK 4 -T TableRecalibration -I %bam -R %ref -recalFile %csvfile -l INFO -log %log -o %out",
+#GATK1        'walltime': "3:00:00:00"
+#GATK1    },
+    'leftalignindels': {
+    	'command': "./GenomeAnalysisTK 20 -allowPotentiallyMisencodedQuals -T LeftAlignIndels -I %input -R %ref -o %output",
+    	'memInGB': 23,
+        'walltime': "7:00:00:00" 
+    },
+    'baseQualRecal': {
+        'command': "./GenomeAnalysisTK 20 -T BaseRecalibrator -I %bam -R %ref --knownSites %dbsnp  -log %log -o %out",
+        'memInGB': 24,
         'walltime': "3:00:00:00"
     },
-    'baseQualRecalTabulate': {
-        'command': "./GenomeAnalysisTK 4 -T TableRecalibration -I %bam -R %ref -recalFile %csvfile -l INFO -log %log -o %out",
+    'baseQualRecalPrintReads': {
+        'command': "./GenomeAnalysisTK 30 -T PrintReads -I %bam -R %ref -BQSR %csvfile -log %log  -o %out",
+        'memInGB': 32,
         'walltime': "3:00:00:00"
     },
     'callSNPs': {
@@ -130,18 +188,18 @@ stages = {
         # ./variant_effect_predictor_2.5
         # ./variant_effect_predictor_2.5/vep_cache
         'command': "perl variant_effect_predictor_2.5/variant_effect_predictor.pl --cache --dir variant_effect_predictor_2.5/vep_cache -i %vcf --vcf -o %out -species human --canonical --gene --protein --sift=b --polyphen=b > %log",
-        'modules': [ "perl/5.10.1", "ensembl/67" ]
+        'modules': [ "perl/5.18.0", "ensembl/67" ]
     },
     'depthOfCoverage': {
         'command': "./GenomeAnalysisTK 4 -T DepthOfCoverage -R %ref -I %bam -L %bed -omitBaseOutput -ct 1 -ct 10 -ct 20 -ct 30 -o %out",
     },
     'exonCoverage': {
         'command': "coverageBed -abam %bam -b %exon_bed > %out",
-        'modules': [ "bedtools/2.9.0" ]
+        'modules': [ "bedtools-intel/2.17.0" ]
     },
     'intersectBam': {
         'command': "intersectBed -abam %bam -b %bed > %out",
-        'modules': [ "bedtools/2.9.0" ]
+        'modules': [ "bedtools-intel/2.17.0" ]
     },
     'collateReadcounts': {
         'command': 'python count_flagstat_exome.py %dir %outdir',
