@@ -35,7 +35,7 @@ from glob import *
 import shutil
 from ruffus import *
 from rubra.utils import pipeline_options
-from rubra.utils import (runStageCheck, mkLogFile, mkDir, mkForceLink)
+from rubra.utils import (runStageCheck, mkLogFile, mkDir, mkForceLink, mkLink)
 from input_fastq import parse_and_link
 
 def make_metadata_string(metadata):
@@ -92,6 +92,10 @@ print
 
 output_dir = working_files['output_dir']
 
+# directory for final summary tables
+ref_dir = os.path.join(output_dir, "reference")
+mkDir(ref_dir)
+
 fastqc_dir = os.path.join(output_dir, "FastQC")
 mkDir(fastqc_dir)
 
@@ -113,6 +117,33 @@ mkDir(results_dir)
 
 # Pipeline declarations
 
+# Making references
+
+#Reference file setup
+RefName=ref_files['fasta_reference'].split("/")[-1]
+print RefName
+fasta_reference=os.path.join(ref_dir, RefName)
+mkLink(ref_files['fasta_reference'], fasta_reference)
+
+@files(fasta_reference, fasta_reference+".indexReferenceBWA.Success")
+def indexRefbwa(inputs, outputs):
+    """
+    Index reference file for use with BWA.
+    """
+    ref = inputs
+    flagFile = outputs
+    runStageCheck('indexReferenceBWA', flagFile, ref)
+
+@files(fasta_reference, [fasta_reference+".fai", fasta_reference+".indexReferenceSAM.Success"])
+def indexRefSamtools(inputs, outputs):
+    """
+    Index reference file for use with samtools.
+    """
+    ref = inputs
+    out, flagFile = outputs
+    runStageCheck('indexReferenceSAM', flagFile, ref)
+
+
 # Alignment and correction steps
 
 @transform(fastq_files, regex('(.+\/)?(.+?)\.fastq\.gz'), 
@@ -125,6 +156,7 @@ def fastqc(inputs, outputs):
     fastqc_dest, flagFile = outputs
     runStageCheck('fastqc', flagFile, fastqc_dir, sequence)
 
+@follows(indexRefbwa, indexRefSamtools)
 @transform(fastq_files, regex(r".*?(([^/]+)(_1|_2))\.fastq.gz"), 
         [r"%s/\1.sai" % sambam_dir, r"%s/\1.alignBwa.Success" % sambam_dir])
 def alignBWA(inputs, outputs):
@@ -138,7 +170,7 @@ def alignBWA(inputs, outputs):
     if fastq_metadata[os.path.basename(seq)]['encoding'] == 'I':
         encodingflag = '-I'
     print "bwa aln on %s" % os.path.basename(seq)
-    runStageCheck('alignBWA', flag_file, encodingflag, ref_files['bwa_reference'], seq, output)
+    runStageCheck('alignBWA', flag_file, encodingflag, fasta_reference, seq, output)
 
 # Convert alignments to SAM format.
 # This assumes paired-end; if we have single end we should wrap in a conditional and in the other case
@@ -161,7 +193,7 @@ def alignToSam(inputs, outputs):
                            'ID': "%s_%s_Lane%d" % (sample, runID, lane) }
     metadata_str = make_metadata_string(readgroup_metadata)
     print "bwa sampe on %s,%s" % (os.path.basename(sai1), os.path.basename(sai2))
-    runStageCheck('alignToSamPE', flag_file, ref_files['bwa_reference'], metadata_str, sai1, sai2, seq1, seq2, output)
+    runStageCheck('alignToSamPE', flag_file, fasta_reference, metadata_str, sai1, sai2, seq1, seq2, output)
 
 @transform(alignToSam, suffix(".sam"),
             [".bam", ".samToBam.Success"])
@@ -211,7 +243,7 @@ def realignIntervals(inputs, outputs):
     output_intervals, flag_file = outputs
     logFile = mkLogFile(logDir, bam, '.realignIntervals.log')
     print "calculating realignment intervals for %s" % os.path.basename(bam)
-    runStageCheck('realignIntervals', flag_file, ref_files['fasta_reference'], bam, ref_files['indels_realign_goldstandard'], ref_files['indels_realign_1000G'], ref_files['exon_bed'], logFile, output_intervals)
+    runStageCheck('realignIntervals', flag_file, fasta_reference, bam, ref_files['indels_realign_goldstandard'], ref_files['indels_realign_1000G'], ref_files['exon_bed'], logFile, output_intervals)
 
 def remove_GATK_bai(bamfile):
     """
@@ -236,52 +268,83 @@ def realign(inputs, outputs):
     output_bam, flag_file = outputs
     logFile = mkLogFile(logDir, input_bam, '.realign.log')
     print "realigning %s" % os.path.basename(input_bam)
-    runStageCheck('realign', flag_file, ref_files['fasta_reference'], input_bam, intervals, logFile, output_bam)
+    runStageCheck('realign', flag_file, fasta_reference, input_bam, intervals, logFile, output_bam)
     remove_GATK_bai(output_bam)
 
-@follows('indexRealignedBams')
-@transform(realign, suffix('.bam'),
-            ['.recal_data.csv', '.baseQualRecalCount.Success'])
-def baseQualRecalCount(inputs, outputs):
+@transform(realign, suffix('.bam'), ['.bam.bai', '.indexRealignedBams.Success'])
+def indexRealignedBam(inputs, outputs):
     """
-    GATK CountCovariates, first step of base quality score recalibration.
+    Index the locally realigned bams using samtools.
     """
-    bam, _success = inputs
-    output_csv, flag_file = outputs
-    logFile = mkLogFile(logDir, bam, '.baseQualRecalCount.log')
-    print "count covariates using GATK for base quality score recalibration: %s" % os.path.basename(bam)
-    runStageCheck('baseQualRecalCount', flag_file, bam, ref_files['fasta_reference'], ref_files['dbsnp'], logFile, output_csv)
+    bam, _realign_success = inputs
+    output, flagFile = outputs
+    print "samtools index on %s" % bam
+    runStageCheck('indexBam', flagFile, bam)
 
-@transform(baseQualRecalCount, regex(r'(.*?)([^/]+)\.recal_data\.csv'), 
-            add_inputs([r'\1\2.bam']), 
-            [r'\1\2.recal.bam', r'\1\2.baseQualRecalTabulate.Success'])
-def baseQualRecalTabulate(inputs, outputs):
+@transform([realign, indexRealignedBam], suffix('.bam'), ['.leftAligned.bam', '.leftAlignIndels.Success'])
+def leftAlign(inputs,outputs):
     """
-    GATK TableRecalibration: recalibrate base quality scores using the output of CountCovariates.
+    GATK LeftAlignIndels is a tool that takes a bam file and left-aligns any indels inside it
+    'command': "java -Xmx22g -jar " + GATK_HOME + "GenomeAnalysisTK.jar -allowPotentiallyMisencodedQuals -T LeftAlignIndels -I %input -R %ref -o %output"
     """
-    [input_csv, _success], [input_bam] = inputs
-    output_bam, flag_file = outputs
-    logFile = mkLogFile(logDir, input_bam, '.baseQualRecalTabulate.log')
-    print "recalibrate base quality scores using GATK on %s" % os.path.basename(input_bam)
-    runStageCheck('baseQualRecalTabulate', flag_file, input_bam, ref_files['fasta_reference'], input_csv, logFile, output_bam)
+    bam, _realign_success = inputs
+    output_bam, flagFile = outputs
+    runStageCheck('leftalignindels', flagFile, bam, Reference, output_bam)
+    remove_GATK_bai(output_bam)
+    
+@transform(leftAlign, suffix('.bam'), ['.bam.bai', '.indexleftAlignBam.Success'])
+def indexleftAlignBam(inputs, outputs):
+    """
+    Index the locally realigned bams using samtools.
+    """
+    bam, _leftAlign_success = inputs
+    output, flagFile = outputs
+    print "samtools index on %s" % bam
+    runStageCheck('indexBam', flagFile, bam)
+
+
+@transform([leftAlign,indexleftAlignBam], suffix('.bam'), ['.recal_data.grp', '.baseQualRecal.Success'])
+def baseQualRecal(inputs, outputs):
+    """
+    GATK BaseRecalibrator, first step of base quality score recalibration.
+    'command': "java -Xmx22g -jar /vlsci/VR0245/shared/charlotte-working/programs/GenomeAnalysisTKLite-2.3-9-gdcdccbb/GenomeAnalysisTKLite.jar -T BaseRecalibrator -I %bam -R %ref --knownSites %dbsnp -nt 8 -log %log -o %out"
+    """
+    bam, _leftAlign_success = inputs
+    output_grp, flagFile = outputs
+    logFile = mkLogFile(pipeline_options.pipeline['logDir'], bam, '.baseQualRecal.log')
+    print "Base Quality recal using GATK for: %s" % bam
+    runStageCheck('baseQualRecal', flagFile, bam, Reference, pipeline_options.pipeline['dbSNP'], logFile, output_grp)
+
+@transform([baseQualRecal, realign], regex(r'(.*?)([^/]+)\.recal_data\.grp'), add_inputs([r'\1\2.bam']), [r'\1\2.recal.bam', r'\1\2.baseQualRecalPrint.Success'])
+def baseQualRecalPrint(inputs, outputs):
+    """
+    GATK TableRecalibration: write reads after base quality scores using the output of baseQualRecal.
+    'command': "java -Xmx7g -jar /vlsci/VR0245/shared/charlotte-working/programs/GenomeAnalysisTKLite-2.3-9-gdcdccbb/GenomeAnalysisTKLite.jar -T PrintReads -I %bam -R %ref -BQSR %csvfile -log %log -o %out"
+    """
+    [[input_grp, _baseQualRecal_success], [input_bam]] = inputs
+    output_bam, flagFile = outputs
+    logFile = mkLogFile(pipeline_options.pipeline['logDir'], input_bam, '.baseQualRecalTabulate.log')
+    print "recalibrate base quality scores using GATK on %s" % input_bam
+    runStageCheck('baseQualRecalPrintReads', flagFile, input_bam, Reference, input_grp, logFile, output_bam)
     remove_GATK_bai(output_bam)
 
-# Temporarily putting this indexing step here to work around bug
-@transform(baseQualRecalTabulate, suffix('.bam'),
-            ['.bam.bai', '.bam.indexRecalibratedBams.Success'])
-def indexRecalibratedBams(inputs, outputs):
+@transform(baseQualRecalPrint, suffix('.bam'), ['.bam.bai', '.indexRealignedBams.Success'])
+def indexBaseQualRecalBam(inputs, outputs):
     """
-    Index the recalibrated bams using samtools. 
+    Index the locally realigned bams using samtools.
     """
-    bam, _success = inputs
-    output, flag_file = outputs
-    print "samtools index on %s" % os.path.basename(bam)
-    runStageCheck('indexBam', flag_file, bam)
+    bam, _baseRecalBam_success = inputs
+    output, flagFile = outputs
+    print "samtools index on %s" % bam
+    runStageCheck('indexBam', flagFile, bam)
+
+
+
 
 # Variant calling steps
 
-@follows(indexRecalibratedBams)
-@transform(baseQualRecalTabulate, 
+@follows(indexBaseQualRecalBam)
+@transform(baseQualRecalPrint, 
             regex(r'(.*?)([^/]+)\.recal\.bam'),
             [r'%s/\2.SNP.vcf' % variant_dir, 
              r'%s/\2.SNP.vcf.idx' % variant_dir, 
@@ -294,10 +357,10 @@ def callSNPs(inputs, outputs):
     output_vcf, _idx, flag_file = outputs
     logFile = mkLogFile(logDir, bam, '.callSNPs.log')
     print "calling SNPs from %s" % bam
-    runStageCheck('callSNPs', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], ref_files['dbsnp'], logFile, output_vcf)
+    runStageCheck('callSNPs', flag_file, fasta_reference, bam, ref_files['exon_bed'], ref_files['dbsnp'], logFile, output_vcf)
 
-@follows(indexRecalibratedBams)
-@transform(baseQualRecalTabulate, 
+@follows(indexBaseQualRecalBam)
+@transform(baseQualRecalPrint, 
             regex(r'(.*?)([^/]+)\.recal\.bam'),
             [r'%s/\2.INDEL.vcf' % variant_dir, 
              r'%s/\2.INDEL.vcf.idx' % variant_dir, 
@@ -310,7 +373,7 @@ def callIndels(inputs, outputs):
     output_vcf, _idx, flag_file = outputs
     logFile = mkLogFile(logDir, bam, '.callIndels.log')
     print "calling Indels from %s" % bam
-    runStageCheck('callIndels', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], ref_files['dbsnp'], logFile, output_vcf)
+    runStageCheck('callIndels', flag_file, fasta_reference, bam, ref_files['exon_bed'], ref_files['dbsnp'], logFile, output_vcf)
 
 @transform(callSNPs, suffix('.SNP.vcf'),
             ['.SNP.filtered.vcf', '.SNP.filtered.vcf.idx', '.filterSNPs.Success'])
@@ -322,7 +385,7 @@ def filterSNPs(inputs, outputs):
     output_vcf, _idxout, flag_file = outputs
     logFile = mkLogFile(logDir, input_vcf, '.filterSNPs.log')
     print "filtering SNPs from %s" % input_vcf
-    runStageCheck('filterSNPs', flag_file, ref_files['fasta_reference'], input_vcf, logFile, output_vcf)
+    runStageCheck('filterSNPs', flag_file, fasta_reference, input_vcf, logFile, output_vcf)
 
 @transform(callIndels, suffix('.INDEL.vcf'),
             ['.INDEL.filtered.vcf', '.INDEL.filtered.vcf.idx', '.filterIndels.Success'])
@@ -334,7 +397,7 @@ def filterIndels(inputs, outputs):
     output_vcf, _idxout, flag_file = outputs
     logFile = mkLogFile(logDir, input_vcf, '.filterIndels.log')
     print "filtering indels from %s" % input_vcf
-    runStageCheck('filterIndels', flag_file, ref_files['fasta_reference'], input_vcf, logFile, output_vcf)
+    runStageCheck('filterIndels', flag_file, fasta_reference, input_vcf, logFile, output_vcf)
 
 @transform([filterSNPs, filterIndels], regex(r'.*?([^/]+)\.vcf'), 
     [r'%s/\1.ensembl.vcf' % ensembl_dir,r'%s/\1.getEnsemblAnnotations.Success' % ensembl_dir])
@@ -419,7 +482,7 @@ def igvcountDedupedBams(inputs, outputs):
     print "igvtools count on %s" % os.path.basename(bam)
     runStageCheck('igvcount', flag_file, bam, outfile)
 
-@transform(baseQualRecalTabulate, suffix('.bam'),
+@transform(baseQualRecalPrint, suffix('.bam'),
             ['.bam.tdf', '.bam.igvcountRecalibratedBams.Success'])
 def igvcountRecalibratedBams(inputs, outputs):
     """
@@ -475,7 +538,7 @@ def earlyDepthOfCoverage(inputs, outputs):
     output_example = outputs[0]
     output_base = os.path.splitext(output_example)[0]
     print "calculating coverage statistics using GATK DepthOfCoverage on %s" % bam
-    runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], output_base)
+    runStageCheck('depthOfCoverage', flag_file, fasta_reference, bam, ref_files['exon_bed'], output_base)
 
 @follows(indexDedupedBams)
 @transform(dedup, 
@@ -497,10 +560,10 @@ def dedupedDepthOfCoverage(inputs, outputs):
     output_example = outputs[0]
     output_base = os.path.splitext(output_example)[0]
     print "calculating coverage statistics using GATK DepthOfCoverage on %s" % bam
-    runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], output_base)
+    runStageCheck('depthOfCoverage', flag_file, fasta_reference, bam, ref_files['exon_bed'], output_base)
 
-@follows(indexRecalibratedBams)
-@transform(baseQualRecalTabulate, 
+@follows(indexBaseQualRecalBam)
+@transform(baseQualRecalPrint, 
             regex(r'(.*?)([^/]+)\.recal\.bam'),
             [r'%s/\2.DepthOfCoverage.sample_cumulative_coverage_counts' % coverage_dir, 
             r'%s/\2.DepthOfCoverage.sample_cumulative_coverage_proportions' % coverage_dir, 
@@ -519,10 +582,10 @@ def finalDepthOfCoverage(inputs, outputs):
     output_example = outputs[0]
     output_base = os.path.splitext(output_example)[0]
     print "calculating coverage statistics using GATK DepthOfCoverage on %s" % bam
-    runStageCheck('depthOfCoverage', flag_file, ref_files['fasta_reference'], bam, ref_files['exon_bed'], output_base)
+    runStageCheck('depthOfCoverage', flag_file, fasta_reference, bam, ref_files['exon_bed'], output_base)
 
-@follows(indexRecalibratedBams)
-@transform(baseQualRecalTabulate, 
+@follows(indexBaseQualRecalBam)
+@transform(baseQualRecalPrint, 
             regex(r'(.*?)([^/]+)\.recal\.bam'),
             [r'%s/\2.exon_coverage.txt' % coverage_dir, 
             r'%s/\2.exonCoverage.Success' % coverage_dir])
@@ -642,3 +705,4 @@ def collateReadCounts(inputs, outputs):
     flag_file = outputs[-1]
     print "Collating read counts"
     runStageCheck('collateReadcounts', flag_file, in_dir, out_dir)
+

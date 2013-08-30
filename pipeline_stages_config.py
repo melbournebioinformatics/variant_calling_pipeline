@@ -123,28 +123,44 @@ stages = {
     },
     'realignIntervals': {
         # Hard-coded to take 2 known indels files right now
-        'command': "./GenomeAnalysisTK 1 -T RealignerTargetCreator -R %ref -I %bam --known %indels_goldstandard --known %indels_1000G -L %bed -log %log -o %out",
+        'command': "./GenomeAnalysisTK 23 -T RealignerTargetCreator -R %ref -I %bam --known %indels_goldstandard --known %indels_1000G -L %bed -log %log -o %out",
         'memInGB': 23,
-        'walltime': "7:00:00:00"
+        'walltime': "24:00:00"
     },
     'realign': {
         'command': "./GenomeAnalysisTK 22 -T IndelRealigner -R %ref -I %bam -targetIntervals %intervals -log %log -o %out",
         'memInGB': 23,
-        'walltime': "7:00:00:00"
+        'walltime': "48:00:00"
     },
     'dedup': {
-        'command': "./MarkDuplicates 6 INPUT=%bam REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT AS=true METRICS_FILE=%log OUTPUT=%out",
-        'walltime': '7:00:00:00'
+        'command': "./MarkDuplicates 24 INPUT=%bam REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT AS=true METRICS_FILE=%log OUTPUT=%out",
+        'memInGB': 30,
+        'walltime': '48:00:00'
     },
-    'baseQualRecalCount': {
-        'command': "./GenomeAnalysisTK 12 -T CountCovariates -I %bam -R %ref --knownSites %dbsnp -nt 8 -l INFO -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -log %log -recalFile %out",
-        'queue': 'smp',
+#GATK1    'baseQualRecalCount': {
+#GATK1        'command': "./GenomeAnalysisTK 12 -T CountCovariates -I %bam -R %ref --knownSites %dbsnp -nt 8 -l INFO -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -log %log -recalFile %out",
+#GATK1        'queue': 'smp',
+#GATK1        'memInGB': 23,
+#GATK1        'walltime': "3:00:00:00"
+#GATK1    },
+#GATK1    'baseQualRecalTabulate': {
+#GATK1        'command': "./GenomeAnalysisTK 4 -T TableRecalibration -I %bam -R %ref -recalFile %csvfile -l INFO -log %log -o %out",
+#GATK1        'walltime': "3:00:00:00"
+#GATK1    },
+    'leftalignindels': {
+        'command': "./GenomeAnalysisTK 20 -allowPotentiallyMisencodedQuals -T LeftAlignIndels -I %input -R %ref -o %output",
         'memInGB': 23,
+        'walltime': "24:00:00" 
+    },
+    'baseQualRecal': {
+        'command': "./GenomeAnalysisTK 20 -T BaseRecalibrator -I %bam -R %ref --knownSites %dbsnp  -log %log -o %out",
+        'memInGB': 24,
         'walltime': "3:00:00:00"
     },
-    'baseQualRecalTabulate': {
-        'command': "./GenomeAnalysisTK 4 -T TableRecalibration -I %bam -R %ref -recalFile %csvfile -l INFO -log %log -o %out",
-        'walltime': "3:00:00:00"
+    'baseQualRecalPrintReads': {
+        'command': "./GenomeAnalysisTK 30 -T PrintReads -I %bam -R %ref -BQSR %csvfile -log %log  -o %out",
+        'memInGB': 32,
+        'walltime': "30:00:00"
     },
     'callSNPs': {
         'command': "./GenomeAnalysisTK 12 -T UnifiedGenotyper -nt 8 -R %ref -I %bam -L %bed --dbsnp %dbsnp -stand_call_conf 50.0 -stand_emit_conf 10.0 -dcov 1600 -l INFO -A AlleleBalance -A DepthOfCoverage -A FisherStrand -glm SNP -log %log -o %out",
