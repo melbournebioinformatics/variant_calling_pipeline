@@ -18,9 +18,9 @@ More command-line options are described in the Rubra documentation.
 
 ## Running on VLSCI's clusters (e.g. merri)
 
-On merri we have a version of Rubra installed into Python 2.7.3, which you can load with
+On merri we have a version of Rubra installed into Python 2.7.5, which you can load with
 
-    module load python-gcc/2.7.3
+    module load python-gcc/2.7.5
 
 To use the flowchart option you will need graphviz, which you can load with
 
