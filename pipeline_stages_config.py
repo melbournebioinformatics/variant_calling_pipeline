@@ -18,9 +18,8 @@
 #      works for distributed jobs.
 stageDefaults = {
     'distributed': True,
-    'walltime': "08:00:00",
+    'walltime': "01:00:00",
     'memInGB': 8,
-    'queue': "batch",
     'modules': [
         "bwa-gcc/0.5.9",
         "samtools-gcc/0.1.16",
@@ -40,12 +39,11 @@ stageDefaults = {
 stages = {
     "fastqc": {
         "command": "fastqc --quiet -o %outdir %seq",
-        "walltime": "10:00:00",
         'modules': [ "fastqc/0.10.1" ]
     },
     'alignBWA': {
         'command': "bwa aln -t 8 %encodingflag %ref %seq > %out",
-        'walltime': "18:00:00",
+        'walltime': "3:00:00",
         'queue': 'smp',
         'memInGB': 23
     },
@@ -57,11 +55,11 @@ stages = {
     },
     'samToSortedBam': {
         'command': "./SortSam 6 VALIDATION_STRINGENCY=LENIENT INPUT=%seq OUTPUT=%out SORT_ORDER=coordinate",
-        'walltime': "32:00:00",
+        'walltime': "5:00:00",
     },
     'mergeBams': {
         'command': "./PicardMerge 6 %baminputs USE_THREADING=true VALIDATION_STRINGENCY=LENIENT AS=true OUTPUT=%out",
-        'walltime': "72:00:00"
+        'walltime': "5:00:00"
     },
     'indexBam': {
         'command': "samtools index %bam"
@@ -82,38 +80,38 @@ stages = {
         # Hard-coded to take 2 known indels files right now
         'command': "./GenomeAnalysisTK 1 -T RealignerTargetCreator -R %ref -I %bam --known %indels_goldstandard --known %indels_1000G -log %log -o %out",
         'memInGB': 23,
-        'walltime': "7:00:00:00"
+        'walltime': "5:00:00"
     },
     'realign': {
         'command': "./GenomeAnalysisTK 22 -T IndelRealigner -R %ref -I %bam -targetIntervals %intervals -log %log -o %out",
         'memInGB': 23,
-        'walltime': "7:00:00:00"
+        'walltime': "5:00:00"
     },
     'dedup': {
         'command': "./MarkDuplicates 6 INPUT=%bam REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT AS=true METRICS_FILE=%log OUTPUT=%out",
-        'walltime': '7:00:00:00'
+        'walltime': '5:00:00'
     },
     'baseQualRecalCount': {
         'command': "./GenomeAnalysisTK 12 -T CountCovariates -I %bam -R %ref --knownSites %dbsnp -nt 8 -l INFO -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -log %log -recalFile %out",
         'queue': 'smp',
         'memInGB': 23,
-        'walltime': "3:00:00:00"
+        'walltime': "5:00:00"
     },
     'baseQualRecalTabulate': {
         'command': "./GenomeAnalysisTK 4 -T TableRecalibration -I %bam -R %ref -recalFile %csvfile -l INFO -log %log -o %out",
-        'walltime': "3:00:00:00"
+        'walltime': "5:00:00"
     },
     'callSNPs': {
         'command': "./GenomeAnalysisTK 12 -T UnifiedGenotyper -nt 8 -R %ref -I %bam --dbsnp %dbsnp -stand_call_conf 50.0 -stand_emit_conf 10.0 -dcov 1600 -l INFO -A AlleleBalance -A DepthOfCoverage -A FisherStrand -glm SNP -log %log -o %out",
         'queue': 'smp',
         'memInGB': 23,
-        'walltime': "24:00:00"
+        'walltime': "3:00:00"
     },
     'callIndels': {
         'command': "./GenomeAnalysisTK 12 -T UnifiedGenotyper -nt 8 -R %ref -I %bam --dbsnp %dbsnp -stand_call_conf 50.0 -stand_emit_conf 10.0 -dcov 1600 -l INFO -A AlleleBalance -A DepthOfCoverage -A FisherStrand -glm INDEL -log %log -o %out",
         'queue': 'smp',
         'memInGB': 23,
-        'walltime': "24:00:00"
+        'walltime': "3:00:00"
     },
     'filterSNPs': {
         # Very minimal hard filters based on GATK recommendations. VQSR is preferable if possible.
