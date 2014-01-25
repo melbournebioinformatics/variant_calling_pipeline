@@ -16,6 +16,12 @@ Usage:
 
 More command-line options are described in the Rubra documentation.
 
+Specifically, to use the provided config files, you might call
+
+    rubra pipeline.py --config pipeline_dev_config.py pipeline_stages_config.py --style print
+    
+If you use the provided config files, you should make sure you understand the analysis steps and that they are appropriate for your project.
+
 ## Running on VLSCI's clusters (e.g. merri)
 
 On merri we have a version of Rubra installed into Python 2.7.5, which you can load with
