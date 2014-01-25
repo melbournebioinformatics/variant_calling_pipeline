@@ -22,6 +22,12 @@ Specifically, to use the provided config files, you might call
     
 If you use the provided config files, you should make sure you understand the analysis steps and that they are appropriate for your project.
 
+If you use this code or Rubra itself in your research, please cite the poster at http://figshare.com/articles/Rubra_flexible_distributed_pipelines/895626 like so:
+
+    Sloggett, Clare; Wakefield, Matthew; Philip, Gayle; Pope, Bernard (2014): 
+    Rubra - flexible distributed pipelines. figshare. 
+    http://dx.doi.org/10.6084/m9.figshare.895626
+
 ## Running on VLSCI's clusters (e.g. merri)
 
 On merri we have a version of Rubra installed into Python 2.7.5, which you can load with
