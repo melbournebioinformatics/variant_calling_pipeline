@@ -10,7 +10,8 @@
 #  - memInGB: for a distributed PBS job, gives the memory in Gigabytes requested from the 
 #      job queue system. For local jobs has no effect.
 #  - queue: for a distributed PBS job, this is the name of the queue to submit the
-#      job to. For local jobs has no effect.
+#      job to. For local jobs has no effect. This is currently a mandatory field for
+#      distributed jobs, but can be set to None.
 #  - modules: the modules to be loaded before running the task. This is intended for  
 #      systems with environment modules installed. Rubra will call module load on each 
 #      required module before running the task. Note that defining modules for individual 
@@ -18,14 +19,15 @@
 #      works for distributed jobs.
 stageDefaults = {
     'distributed': True,
+    'queue': None,
     'walltime': "01:00:00",
     'memInGB': 8,
     'modules': [
-        "bwa-gcc/0.5.9",
-        "samtools-gcc/0.1.16",
+        "bwa-intel/0.6.2",
+        "samtools-intel/0.1.19",
         "picard/1.53",
-        "python-gcc/2.6.4",
-        "R-gcc/2.12.0",
+        "python-gcc/2.7.5",
+        "R-gcc/3.0.2",
         "gatk/1.6-7"
     ]
 }
