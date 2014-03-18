@@ -23,7 +23,7 @@ stageDefaults = {
     'walltime': "01:00:00",
     'memInGB': 8,
     'modules': [
-        "bwa-intel/0.6.2",
+        "bwa-intel/0.7.5a",
         "samtools-intel/0.1.19",
         "picard/1.53",
         "python-gcc/2.7.5",
@@ -43,17 +43,17 @@ stages = {
         "command": "fastqc --quiet -o %outdir %seq",
         'modules': [ "fastqc/0.10.1" ]
     },
-    'alignBWA': {
-        'command': "bwa aln -t 8 %encodingflag %ref %seq > %out",
+    'bwaMemSE': {
+        'command': "bwa mem -t 8 %meta %ref %seq > %out",
         'walltime': "3:00:00",
         'queue': 'smp',
         'memInGB': 23
     },
-    'alignToSamSE': {
-        'command': "bwa samse %ref %meta %align %seq > %out"
-    },
-    'alignToSamPE': {
-        'command': "bwa sampe %ref %meta %align1 %align2 %seq1 %seq2 > %out"
+    'bwaMemPE': {
+        'command': "bwa mem -t 8 %meta %ref %seq1 %seq2 > %out",
+        'walltime': "3:00:00",
+        'queue': 'smp',
+        'memInGB': 23
     },
     'samToSortedBam': {
         'command': "./SortSam 6 VALIDATION_STRINGENCY=LENIENT INPUT=%seq OUTPUT=%out SORT_ORDER=coordinate",
