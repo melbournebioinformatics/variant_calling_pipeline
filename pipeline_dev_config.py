@@ -81,8 +81,8 @@ working_files = {
 #  - indels_realign_1000G: files of known indels for use in GATK local realignment.
 #       Currently the Broad Institute recommends using these two files (see above).
 ref_files = {
-    'fasta_reference': '/vlsci/VR0002/shared/Reference_Files/Indexed_Ref_Genomes/bwa_Indexed/human_g1k_v37.fasta',
-    'bwa_reference': '/vlsci/VR0002/shared/Reference_Files/Indexed_Ref_Genomes/bwa_Indexed/human_g1k_v37.fasta',
+    'fasta_reference': '/vlsci/VR0002/shared/Reference_Files/Indexed_Ref_Genomes/bwa_6.1_Indexed/human_g1k_v37.fasta',
+    'bwa_reference': '/vlsci/VR0002/shared/Reference_Files/Indexed_Ref_Genomes/bwa__6.1_Indexed/human_g1k_v37.fasta',
 
     'exon_bed': '/vlsci/VR0244/shared/Ruth_Exome/SureSelect_XT_Human_All_Exon_v4plus_UTR/TruSeqCustom_WOAgilentSSXTHAEv4TR_targeted_regions.bed',
     'exon_bed_extended': '/vlsci/VR0244/shared/Ruth_Exome/SureSelect_XT_Human_All_Exon_v4plus_UTR/TruSeqCustom_WOAgilentSSXTHAEv4TR_targeted_regions_plusMinus150bp.bed',
