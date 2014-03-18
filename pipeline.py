@@ -39,7 +39,7 @@ from rubra.utils import (runStageCheck, mkLogFile, mkDir, mkForceLink)
 from input_fastq import parse_and_link
 
 def make_metadata_string(metadata):
-    return r'-r"@RG\tID:%s\tSM:%s\tPL:%s"' % (metadata['ID'], metadata['SM'], metadata['PL'])
+    return r'-R"@RG\tID:%s\tSM:%s\tPL:%s"' % (metadata['ID'], metadata['SM'], metadata['PL'])
 
 # Shorthand access to options
 ref_files = pipeline_options.ref_files
@@ -55,7 +55,6 @@ fastq_metadata = defaultdict(dict)
 original_fastq_files = []
 for fastq_dir in working_files['fastq_dirs']:
     original_fastq_files += glob(os.path.join(fastq_dir, '*.fastq.gz'))
-    original_fastq_files += glob(os.path.join(fastq_dir, '*_sequence.txt.gz'))
 
 if len(original_fastq_files)==0:
     print "No input files found. Do the filenames follow the naming convention?"
@@ -125,34 +124,15 @@ def fastqc(inputs, outputs):
     fastqc_dest, flagFile = outputs
     runStageCheck('fastqc', flagFile, fastqc_dir, sequence)
 
-@transform(fastq_files, regex(r".*?(([^/]+)(_1|_2))\.fastq.gz"), 
-        [r"%s/\1.sai" % sambam_dir, r"%s/\1.alignBwa.Success" % sambam_dir])
-def alignBWA(inputs, outputs):
+@collate(fastq_files, regex(r".*?([^/]+)(_1|_2)\.fastq.gz"), 
+        [r"%s/\1.sam" % sambam_dir, r"%s/\1.bwaPE.Success" % sambam_dir])
+def bwaPE(inputs, outputs):
     """
-    Align sequence reads to the reference genome. This is bwa's first stage, bwa aln.
-    Use -I for _sequence.txt files.
+    Aligns two paired-end fastq files to a reference genome to produce a sam file.
     """
-    seq = inputs
+    seq1, seq2 = sorted(inputs)
     output, flag_file = outputs
-    encodingflag = ''
-    if fastq_metadata[os.path.basename(seq)]['encoding'] == 'I':
-        encodingflag = '-I'
-    print "bwa aln on %s" % os.path.basename(seq)
-    runStageCheck('alignBWA', flag_file, encodingflag, ref_files['bwa_reference'], seq, output)
-
-# Convert alignments to SAM format.
-# This assumes paired-end; if we have single end we should wrap in a conditional and in the other case
-#   define with @transform not @collate, and call SamSE not SamPE
-@collate(alignBWA, regex(r"(.*?)([^/]+)(_1|_2)\.sai"), 
-        add_inputs(r"%s/\2\3.fastq.gz" % working_files['fastq_symlink_dir']),
-        [r"\1\2.sam", r"\1\2.alignToSam.Success"])
-def alignToSam(inputs, outputs):
-    """
-    Turn two paired-end bwa "sai" alignments into a sam file.
-    """
-    output,flag_file = outputs
-    [sai1, seq1], [sai2, seq2] = [[sai, seq] for [[sai, _flag_file], seq] in inputs]
-    fastq_name = os.path.splitext(os.path.basename(sai1))[0] + ".fastq.gz"
+    fastq_name = os.path.basename(seq1)
     sample = fastq_metadata[fastq_name]['sample']
     runID = fastq_metadata[fastq_name]['run_id']
     lane = fastq_metadata[fastq_name]['lane']
@@ -160,10 +140,10 @@ def alignToSam(inputs, outputs):
                            'SM': sample,
                            'ID': "%s_%s_Lane%d" % (sample, runID, lane) }
     metadata_str = make_metadata_string(readgroup_metadata)
-    print "bwa sampe on %s,%s" % (os.path.basename(sai1), os.path.basename(sai2))
-    runStageCheck('alignToSamPE', flag_file, ref_files['bwa_reference'], metadata_str, sai1, sai2, seq1, seq2, output)
+    print "bwa-mem on %s and %s" % (os.path.basename(seq1), os.path.basename(seq2))
+    runStageCheck('bwaMemPE', flag_file, metadata_str, ref_files['bwa_reference'], seq1, seq2, output)
 
-@transform(alignToSam, suffix(".sam"),
+@transform(bwaPE, suffix(".sam"),
             [".bam", ".samToBam.Success"])
 def samToBam(inputs, outputs):
     """
